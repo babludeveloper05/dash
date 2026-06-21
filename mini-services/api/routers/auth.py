@@ -8,6 +8,7 @@ from database import get_db
 from models import User
 from schemas import UserCreate, UserLogin, Token, UserOut
 from auth import hash_password, verify_password, create_access_token, decode_access_token
+from security import sanitize_text
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -31,7 +32,7 @@ def register(body: UserCreate, db: Session = Depends(get_db)):
     user = User(
         email=body.email,
         password_hash=hash_password(body.password),
-        name=body.name,
+        name=sanitize_text(body.name, 100),
     )
     db.add(user)
     db.commit()

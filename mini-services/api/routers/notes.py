@@ -8,6 +8,7 @@ from database import get_db
 from models import Note, User
 from schemas import NoteCreate, NoteUpdate, NoteOut
 from routers.auth import get_current_user
+from security import sanitize_dict
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -19,7 +20,9 @@ def list_notes(user: User = Depends(get_current_user), db: Session = Depends(get
 
 @router.post("", response_model=NoteOut)
 def create_note(body: NoteCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    note = Note(user_id=user.id, **body.model_dump())
+    # Sanitize user input to prevent stored XSS
+    safe = sanitize_dict(body.model_dump(), ['title', 'content', 'subject'])
+    note = Note(user_id=user.id, **safe)
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -31,7 +34,10 @@ def update_note(note_id: str, body: NoteUpdate, user: User = Depends(get_current
     note = db.execute(select(Note).where(Note.id == note_id, Note.user_id == user.id)).scalar_one_or_none()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    for key, val in body.model_dump(exclude_unset=True).items():
+    # Sanitize user input
+    update_data = body.model_dump(exclude_unset=True)
+    safe = sanitize_dict(update_data, ['title', 'content', 'subject'])
+    for key, val in safe.items():
         setattr(note, key, val)
     db.commit()
     db.refresh(note)

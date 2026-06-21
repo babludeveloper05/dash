@@ -23,6 +23,7 @@ from models import (
 )
 from schemas import SyncPayload, SyncResponse
 from routers.auth import get_current_user
+from security import sanitize_text, sanitize_dict
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
@@ -33,7 +34,12 @@ def sync(payload: SyncPayload, user: User = Depends(get_current_user), db: Sessi
 
     # --- Profile ---
     if payload.profile:
-        for key, val in payload.profile.items():
+        # Sanitize profile text fields to prevent stored XSS
+        safe_profile = sanitize_dict(
+            payload.profile,
+            ['name', 'location', 'bio', 'batch', 'exam_name', 'track'],
+        )
+        for key, val in safe_profile.items():
             if hasattr(user, key) and val is not None:
                 setattr(user, key, val)
         db.add(user)
@@ -67,9 +73,9 @@ def sync(payload: SyncPayload, user: User = Depends(get_current_user), db: Sessi
         for n in payload.notes:
             db.add(Note(
                 user_id=user.id,
-                title=n.get("title", ""),
-                subject=n.get("subject", ""),
-                content=n.get("content", ""),
+                title=sanitize_text(n.get("title", ""), 200),
+                subject=sanitize_text(n.get("subject", ""), 100),
+                content=sanitize_text(n.get("content", ""), 50000),
                 tags=n.get("tags", []),
                 updated_at=datetime.fromtimestamp(n.get("updatedAt", 0) / 1000, tz=timezone.utc) if n.get("updatedAt") else datetime.now(timezone.utc),
             ))
@@ -80,8 +86,8 @@ def sync(payload: SyncPayload, user: User = Depends(get_current_user), db: Sessi
         for d in payload.doubts:
             doubt = Doubt(
                 user_id=user.id,
-                text=d.get("text", ""),
-                subject=d.get("subject", "General"),
+                text=sanitize_text(d.get("text", ""), 2000),
+                subject=sanitize_text(d.get("subject", ""), 100),
                 asker=d.get("asker", "You"),
                 upvotes=d.get("upvotes", 0),
                 resolved=d.get("resolved", False),
@@ -93,7 +99,7 @@ def sync(payload: SyncPayload, user: User = Depends(get_current_user), db: Sessi
                     doubt_id=doubt.id,
                     author=a.get("author", ""),
                     role=a.get("role", "AI Tutor"),
-                    text=a.get("text", ""),
+                    text=sanitize_text(a.get("text", ""), 5000),
                     helpful=a.get("helpful", 0),
                     pending=a.get("pending", False),
                     error=a.get("error", False),

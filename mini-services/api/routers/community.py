@@ -1,12 +1,13 @@
-"""Doubts + leaderboard + live sessions read endpoints."""
+"""Doubts + leaderboard + live sessions read endpoints. All require auth."""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from database import get_db
 from models import LeaderboardEntry, LiveSession
+from routers.auth import get_current_user
 
-router = APIRouter(prefix="/community", tags=["community"])
+router = APIRouter(prefix="/community", tags=["community"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/leaderboard")
