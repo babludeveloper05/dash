@@ -1,3 +1,4 @@
+import { config } from "@/config";
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -8,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const res = await fetch('http://localhost:8000/api/auth/register', {
+    const res = await fetch(`${config.backendUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

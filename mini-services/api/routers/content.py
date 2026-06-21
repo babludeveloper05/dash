@@ -1,12 +1,14 @@
-"""Content router — read-only endpoints for subjects, chapters, videos, tests, questions."""
+"""Content router — read-only endpoints for subjects, chapters, videos, tests, questions.
+All endpoints require authentication."""
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from database import get_db
-from models import Subject, Chapter, Video, Test, Question
+from models import Subject, Chapter, Video, Test, Question, User
+from routers.auth import get_current_user
 
-router = APIRouter(prefix="/content", tags=["content"])
+router = APIRouter(prefix="/content", tags=["content"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/subjects")

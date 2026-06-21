@@ -32,7 +32,7 @@ app = FastAPI(
 # CORS — the Next.js app (port 3000) and the gateway (port 81) call this API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS + ["*"],  # permissive in dev; lock down in prod
+    allow_origins=CORS_ORIGINS,  # locked down — no wildcard
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -22,14 +22,19 @@ if _raw_db_url.startswith("file:"):
 DATABASE_URL = _raw_db_url
 
 # JWT settings for auth tokens.
-SECRET_KEY = os.environ.get("SECRET_KEY", "delta-dev-secret-change-in-production")
+# In production, SECRET_KEY MUST be set via environment variable — no default.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production":
+        raise RuntimeError("SECRET_KEY environment variable is required in production")
+    SECRET_KEY = "delta-dev-secret-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-# CORS — the Next.js app runs on port 3000, the gateway on 81.
+# CORS — only allow configured origins. NO wildcard in production.
+_default_origins = "http://localhost:3000,http://localhost:81,http://127.0.0.1:3000,http://127.0.0.1:81"
 CORS_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:81",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:81",
+    origin.strip()
+    for origin in os.environ.get("CORS_ORIGINS", _default_origins).split(",")
+    if origin.strip()
 ]

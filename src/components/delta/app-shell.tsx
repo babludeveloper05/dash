@@ -29,7 +29,7 @@ import {
 } from '@/lib/motion'
 import { ThemeVars } from './theme-vars'
 import { AuthModal } from './auth-modal'
-import { useSync } from '@/lib/sync'
+import { useSync } from '@/adapters/sync-engine'
 import { useRealtime } from '@/lib/realtime'
 
 function ActivePage() {

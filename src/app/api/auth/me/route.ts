@@ -1,3 +1,4 @@
+import { config } from "@/config";
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ user: null })
   }
   try {
-    const res = await fetch('http://localhost:8000/api/auth/me', {
+    const res = await fetch(`${config.backendUrl}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) {
