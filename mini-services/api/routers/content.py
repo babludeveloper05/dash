@@ -27,11 +27,24 @@ def list_chapters(subject_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/videos")
-def list_videos(subject: str | None = Query(None), db: Session = Depends(get_db)):
+def list_videos(
+    subject: str | None = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Returns paginated videos. Use limit + offset for pagination."""
     videos = get_videos(subject, db)
-    return [{"id": v.id, "chapterId": v.chapter_id, "subjectId": v.subject_id,
-             "number": v.number, "title": v.title, "instructor": v.instructor,
-             "durationSec": v.duration_sec} for v in videos]
+    total = len(videos)
+    paginated = videos[offset:offset + limit]
+    return {
+        "items": [{"id": v.id, "chapterId": v.chapter_id, "subjectId": v.subject_id,
+                   "number": v.number, "title": v.title, "instructor": v.instructor,
+                   "durationSec": v.duration_sec} for v in paginated],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/tests")

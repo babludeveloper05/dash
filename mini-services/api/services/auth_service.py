@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from models import User
-from auth import hash_password, verify_password, create_access_token, decode_access_token
+from auth import (
+    hash_password, verify_password,
+    create_access_token, create_refresh_token,
+    decode_access_token, decode_refresh_token,
+    blocklist_token,
+)
 from security import sanitize_text
 from config import MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MINUTES
 
@@ -19,8 +24,8 @@ from config import MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MINUTES
 _login_attempts: dict[str, dict] = {}
 
 
-def register_user(email: str, password: str, name: str, db: Session) -> tuple[User, str]:
-    """Register a new user. Returns (user, access_token).
+def register_user(email: str, password: str, name: str, db: Session) -> tuple[User, str, str]:
+    """Register a new user. Returns (user, access_token, refresh_token).
 
     Raises:
         ValueError: if email is already registered or password too short
@@ -42,12 +47,13 @@ def register_user(email: str, password: str, name: str, db: Session) -> tuple[Us
     db.commit()
     db.refresh(user)
 
-    token = create_access_token({"sub": user.id})
-    return user, token
+    access = create_access_token({"sub": user.id})
+    refresh = create_refresh_token({"sub": user.id})
+    return user, access, refresh
 
 
-def login_user(email: str, password: str, db: Session) -> tuple[User, str]:
-    """Authenticate a user. Returns (user, access_token).
+def login_user(email: str, password: str, db: Session) -> tuple[User, str, str]:
+    """Authenticate a user. Returns (user, access_token, refresh_token).
 
     Raises:
         ValueError: if credentials are invalid or account is locked
@@ -75,8 +81,34 @@ def login_user(email: str, password: str, db: Session) -> tuple[User, str]:
     # Successful login — clear attempts
     _login_attempts.pop(email, None)
 
-    token = create_access_token({"sub": user.id})
-    return user, token
+    access = create_access_token({"sub": user.id})
+    refresh = create_refresh_token({"sub": user.id})
+    return user, access, refresh
+
+
+def refresh_access_token(refresh_token: str, db: Session) -> tuple[str, str] | None:
+    """Exchange a refresh token for a new access + refresh token pair.
+
+    Returns (new_access, new_refresh) or None if the refresh token is invalid.
+    """
+    user_id = decode_refresh_token(refresh_token)
+    if not user_id:
+        return None
+    user = get_user_by_id(user_id, db)
+    if not user:
+        return None
+    # Blocklist the old refresh token (rotation)
+    blocklist_token(refresh_token)
+    new_access = create_access_token({"sub": user.id})
+    new_refresh = create_refresh_token({"sub": user.id})
+    return new_access, new_refresh
+
+
+def logout_user(access_token: str, refresh_token: str | None = None) -> None:
+    """Invalidate tokens by adding them to the blocklist."""
+    blocklist_token(access_token)
+    if refresh_token:
+        blocklist_token(refresh_token)
 
 
 def get_user_by_id(user_id: str, db: Session) -> User | None:
@@ -85,7 +117,7 @@ def get_user_by_id(user_id: str, db: Session) -> User | None:
 
 
 def verify_token(token: str, db: Session) -> User | None:
-    """Verify a JWT token and return the user, or None if invalid."""
+    """Verify a JWT access token and return the user, or None if invalid/blocklisted."""
     user_id = decode_access_token(token)
     if not user_id:
         return None

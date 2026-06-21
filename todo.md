@@ -21,7 +21,7 @@
 ## B. Data Layer (CRITICAL) — 7 items
 
 - [x] 12. Fix sync to pull + apply server data to the store (currently only pushes TO server, never pulls back — multi-device broken) — **DONE: `sync-engine.ts` with `pullState()` applies server response to store**
-- [ ] 13. Add pagination to content API (`/api/content/videos` returns all 360 in one response)
+- [x] 13. Add pagination to content API (`/api/content/videos` returns all 360 in one response) — **DONE: `limit` + `offset` params on `/api/content/videos`, returns `{ items, total, limit, offset }`**
 - [ ] 14. Add composite database indexes for common query patterns
 - [ ] 15. Add database migrations (currently using `create_all()` which can't alter existing tables)
 - [ ] 16. Configure connection pooling for Postgres
@@ -33,10 +33,10 @@
 - [ ] 19. Add password reset / forgot password flow
 - [ ] 20. Add email verification on registration
 - [ ] 21. Wire OAuth (Google/GitHub) via NextAuth (installed but not configured)
-- [ ] 22. Implement session refresh tokens (JWT expires in 7 days with no refresh — user gets logged out mid-session)
-- [ ] 23. Add token rotation for security
+- [x] 22. Implement session refresh tokens (JWT expires in 7 days with no refresh) — **DONE: access token (15 min) + refresh token (30 days) with rotation. Old refresh blocklisted on use.**
+- [x] 23. Add token rotation for security — **DONE via refresh rotation (old refresh blocklisted on each refresh)**
 - [ ] 24. Add "remember me" option (currently always 7 days)
-- [ ] 25. Invalidate JWT server-side on logout (currently token remains valid until expiry)
+- [x] 25. Invalidate JWT server-side on logout (currently token remains valid until expiry) — **DONE: `blocklist_token()` adds jti to in-memory blocklist. Logout endpoint blocklists both access + refresh tokens.**
 
 ### C.2 Auth System Details (current state)
 
@@ -158,16 +158,17 @@
 
 | Severity | Total | Done | Remaining |
 |---|---|---|---|
-| 🔴 CRITICAL (security + data + auth) | 25 | 14 | 11 |
+| 🔴 CRITICAL (security + data + auth) | 25 | 18 | 7 |
 | 🟠 MAJOR (features + performance + errors + testing + devops) | 40 | 9 | 31 |
 | 🟡 MEDIUM (UX polish) | 9 | 2 | 7 |
 | 🟢 LOW (i18n + content + docs) | 12 | 1 | 11 |
-| **Total** | **86** | **26** | **60** |
+| **Total** | **86** | **30** | **56** |
 
-### Completed items (26/86)
+### Completed items (30/86)
 
 **Security (11):** auth on all routes, CORS lockdown, JWT secret env, password validation, input sanitization, security headers, rate limiting, account lockout, DATABASE_URL validation, graceful degradation, error boundary
-**Data (1):** sync pull direction
+**Data (2):** sync pull direction, content API pagination
+**Auth (3):** refresh tokens, token rotation, server-side logout invalidation
 **Real-time (1):** Socket.io auth
 **Error Handling (7):** FastAPI error handler, retry logic, offline detection, loading skeletons, custom 404, graceful degradation, health checks
 **DevOps (1):** environment management (partial)

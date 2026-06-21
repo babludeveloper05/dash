@@ -1,10 +1,8 @@
-import { config } from "@/config";
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
  * POST /api/auth/register
- * Proxies to the FastAPI backend (port 8000) via XTransformPort.
- * Stores the JWT in an httpOnly cookie + returns the user to the client.
+ * Proxies to FastAPI. Sets access + refresh tokens as httpOnly cookies.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -20,13 +18,15 @@ export async function POST(req: NextRequest) {
     }
     const response = NextResponse.json({ user: data.user })
     response.cookies.set('delta-token', data.access_token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/',
+      httpOnly: true, sameSite: 'lax', maxAge: 60 * 15, path: '/', // 15 min (access token)
+    })
+    response.cookies.set('delta-refresh', data.refresh_token, {
+      httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 30, path: '/', // 30 days (refresh token)
     })
     return response
   } catch {
     return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 })
   }
 }
+
+import { config } from '@/config'

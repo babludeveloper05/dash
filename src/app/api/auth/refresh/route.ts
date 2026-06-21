@@ -2,22 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { config } from '@/config'
 
 /**
- * POST /api/auth/login
- * Proxies to FastAPI. Sets access + refresh tokens as httpOnly cookies.
+ * POST /api/auth/refresh
+ * Exchanges the refresh token cookie for a new access + refresh token pair.
+ * Called automatically when the access token expires (15 min).
  */
 export async function POST(req: NextRequest) {
+  const refreshToken = req.cookies.get('delta-refresh')?.value
+  if (!refreshToken) {
+    return NextResponse.json({ error: 'No refresh token' }, { status: 401 })
+  }
+
   try {
-    const body = await req.json()
-    const res = await fetch(`${config.backendUrl}/api/auth/login`, {
+    const res = await fetch(`${config.backendUrl}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ refresh_token: refreshToken }),
     })
     const data = await res.json()
     if (!res.ok) {
-      return NextResponse.json({ error: data.detail || 'Invalid credentials' }, { status: res.status })
+      return NextResponse.json({ error: data.detail || 'Refresh failed' }, { status: res.status })
     }
-    const response = NextResponse.json({ user: data.user })
+    const response = NextResponse.json({ ok: true })
     response.cookies.set('delta-token', data.access_token, {
       httpOnly: true, sameSite: 'lax', maxAge: 60 * 15, path: '/',
     })

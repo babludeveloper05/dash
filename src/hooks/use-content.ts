@@ -136,7 +136,14 @@ export function useContent(): GeneratedContent {
 
       const [subjectsRes, videosRes, testsRes, liveRes, leaderboardRes] = await Promise.all([
         safeJson('/api/content/subjects'),
-        safeJson('/api/content/videos'),
+        safeJson('/api/content/videos?limit=500').then((d: unknown) => {
+          // API returns { items, total, limit, offset } — extract items
+          if (Array.isArray(d)) return d
+          if (d && typeof d === 'object' && 'items' in (d as Record<string, unknown>)) {
+            return (d as { items: unknown[] }).items
+          }
+          return []
+        }),
         safeJson('/api/content/tests'),
         safeJson('/api/community/live'),
         safeJson('/api/community/leaderboard'),
