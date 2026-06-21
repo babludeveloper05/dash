@@ -9,6 +9,7 @@ import {
 import {
   GlassCard, PrimaryButton, GhostButton,
   IconButton, Avatar, EmptyState, Divider, Badge,
+  PageSkeleton, ErrorState,
 } from '@/components/delta/ui'
 import { ScaledPage } from '@/components/delta/scaled-page'
 import { useStore } from '@/lib/store'
@@ -46,6 +47,16 @@ export function LivePage() {
   const setLiveAttended = useStore((s) => s.setLiveAttended)
   const [reminders, setReminders] = useState<Record<string, boolean>>({})
   const [replay, setReplay] = useState(false)
+
+  // Show skeleton while loading
+  if (content.loading) {
+    return <ScaledPage><PageSkeleton variant="list" /></ScaledPage>
+  }
+
+  // Show error state if fetch failed
+  if (content.error) {
+    return <ScaledPage><ErrorState message={content.error} onRetry={content.refresh} /></ScaledPage>
+  }
 
   return (
     <ScaledPage>

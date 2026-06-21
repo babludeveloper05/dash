@@ -7,7 +7,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell,
 } from 'recharts'
 import { Clock, TrendingUp, Flame, Target, Award, Activity, BookOpen } from 'lucide-react'
-import { GlassCard, MetricCard } from '@/components/delta/ui'
+import { GlassCard, MetricCard, PageSkeleton, ErrorState } from '@/components/delta/ui'
 import { ScaledPage } from '@/components/delta/scaled-page'
 import { useStore, useSubjectProgress, useTotalHours } from '@/lib/store'
 import { useContent } from '@/hooks/use-content'
@@ -82,6 +82,16 @@ export function AnalyticsPage() {
     () => Math.round(studyHours.reduce((a, h) => a + h.hours, 0)),
     [studyHours]
   )
+
+  // Show skeleton while loading
+  if (content.loading) {
+    return <ScaledPage><PageSkeleton variant="charts" /></ScaledPage>
+  }
+
+  // Show error state if fetch failed
+  if (content.error) {
+    return <ScaledPage><ErrorState message={content.error} onRetry={content.refresh} /></ScaledPage>
+  }
 
   return (
     <ScaledPage>

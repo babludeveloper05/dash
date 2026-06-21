@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import {
   GlassCard, Pill, Segmented, EmptyState,
+  PageSkeleton, ErrorState,
 } from '@/components/delta/ui'
 import { ScaledPage } from '@/components/delta/scaled-page'
 import { VirtualGrid } from '@/components/delta/virtual'
@@ -215,6 +216,16 @@ export function LibraryPage() {
   }, [subjectFilter, statusFilter, sort, query, vp, videos, chapters])
 
   const subtitle = `${videos.length} lectures · ${totalContentHours}h of content · ${completedCount} completed`
+
+  // Show skeleton while loading
+  if (content.loading) {
+    return <ScaledPage><PageSkeleton variant="grid" /></ScaledPage>
+  }
+
+  // Show error state if fetch failed
+  if (content.error) {
+    return <ScaledPage><ErrorState message={content.error} onRetry={content.refresh} /></ScaledPage>
+  }
 
   return (
     <ScaledPage>

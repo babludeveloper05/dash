@@ -366,3 +366,86 @@ export function EmptyState({ icon, title, hint, cta }: { icon: ReactNode; title:
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn('animate-pulse rounded-lg bg-white/5', className)} />
 }
+
+/**
+ * PageSkeleton — full-page loading skeleton shown while content is fetching.
+ * Adapts to the page type with a rough layout preview.
+ */
+export function PageSkeleton({ variant = 'grid' }: { variant?: 'grid' | 'list' | 'dashboard' | 'charts' }) {
+  if (variant === 'dashboard') {
+    return (
+      <div className="flex flex-col gap-4 p-5">
+        <Skeleton className="h-20 w-full" />
+        <div className="grid grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-48" />)}
+        </div>
+        <div className="grid grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-64" />)}
+        </div>
+      </div>
+    )
+  }
+  if (variant === 'list') {
+    return (
+      <div className="flex flex-col gap-2 p-5">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          <Skeleton key={i} className="h-14 w-full" />
+        ))}
+      </div>
+    )
+  }
+  if (variant === 'charts') {
+    return (
+      <div className="flex flex-col gap-4 p-5">
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24" />)}
+        </div>
+        <Skeleton className="h-72 w-full" />
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-56" />
+          <Skeleton className="h-56" />
+        </div>
+      </div>
+    )
+  }
+  // grid (default — Library, Tests, etc.)
+  return (
+    <div className="flex flex-col gap-4 p-5">
+      <Skeleton className="h-10 w-full max-w-md" />
+      <div className="flex gap-2">
+        {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8 w-20 rounded-full" />)}
+      </div>
+      <div className="grid grid-cols-2 @sm:grid-cols-3 @lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          <Skeleton key={i} className="h-56" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * ErrorState — shown when a page's content fetch fails. Shows the error
+ * message + a retry button.
+ */
+export function ErrorState({ message, onRetry }: { message?: string; onRetry?: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 p-8">
+      <div className="grid place-items-center size-12 rounded-xl bg-destructive/10 text-destructive border border-destructive/20">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div className="text-center">
+        <p className="text-sm font-medium">{message || 'Something went wrong'}</p>
+        <p className="text-xs text-muted-foreground mt-1">Check your connection and try again.</p>
+      </div>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs font-medium hover:brightness-110 transition-all"
+        >
+          Retry
+        </button>
+      )}
+    </div>
+  )
+}

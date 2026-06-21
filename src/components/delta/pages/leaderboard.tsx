@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Crown, TrendingUp, TrendingDown, Minus, Flame, Search, ArrowUpRight } from 'lucide-react'
-import { GlassCard, Pill, Avatar, PrimaryButton, EmptyState } from '@/components/delta/ui'
+import { GlassCard, Pill, Avatar, PrimaryButton, EmptyState, PageSkeleton } from '@/components/delta/ui'
 import { ScaledPage } from '@/components/delta/scaled-page'
 import { VirtualList } from '@/components/delta/virtual'
 import { cn } from '@/lib/utils'
@@ -62,6 +62,11 @@ export function LeaderboardPage() {
     }
     return base
   }, [scope, query, me])
+
+  // Show skeleton while loading and no data yet
+  if (loading && apiData.length === 0) {
+    return <ScaledPage><PageSkeleton variant="list" /></ScaledPage>
+  }
 
   const podium = list.slice(0, 3)
   // Visual order: 2nd (left), 1st (center), 3rd (right)

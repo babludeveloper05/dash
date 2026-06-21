@@ -1276,3 +1276,28 @@ Stage Summary:
 - 3 files modified: store.ts (custom component slice), home.tsx (canvas renders custom components), playground.tsx (template picker + custom rendering).
 - Users can now create their own dashboard components: a TODO list, a Pomodoro timer, a habit counter, a sticky note, a bookmarks list, a progress bar, or a habit chart — all from the Playground, all interactive, all persisted.
 - This is the "truly universal" unlock: any user can build the exact component they need without a developer shipping it.
+
+---
+Task ID: loading-states
+Agent: general-purpose (loading + error states)
+Task: Add loading skeletons and error states to Library, Tests, Analytics, Leaderboard, Live pages
+
+Work Log:
+- Read `/home/z/my-project/src/components/delta/ui.tsx` to inspect `PageSkeleton` (variants: grid/list/dashboard/charts) and `ErrorState` (props: message, onRetry) at the bottom of the file.
+- Read `/home/z/my-project/src/hooks/use-content.ts` to confirm the hook returns `{ loading: boolean, error: string | null, refresh: () => void, ... }`.
+- Read all 5 target page files to identify the `useContent()` call sites and surrounding hook structure.
+- Read `scaled-page.tsx` to confirm nesting `ScaledPage` inside another `ScaledPage` would double-scale (important for tests.tsx where `useContent()` lives inside a sub-component).
+- `library.tsx`: added `PageSkeleton, ErrorState` to the existing `@/components/delta/ui` import; inserted `if (content.loading) return <ScaledPage><PageSkeleton variant="grid" /></ScaledPage>` and `if (content.error) return <ScaledPage><ErrorState ... /></ScaledPage>` after all hooks (just below the `subtitle` const, before the main `return (`). Wraps in `<ScaledPage>` since LibraryPage owns the page-level ScaledPage.
+- `tests.tsx`: added `PageSkeleton, ErrorState` to the existing `@/components/delta/ui` import; inserted the same guards inside `AvailableView` (after the `list` useMemo, before the `motion.div` return). Did NOT wrap in `<ScaledPage>` because `AvailableView` is already rendered inside `TestsPage`'s `<ScaledPage>` — nesting would double-scale.
+- `analytics.tsx`: added `PageSkeleton, ErrorState` to the existing `@/components/delta/ui` import; inserted guards after the `totalHours30d` useMemo (last hook), before the main return. Used `variant="charts"` per the spec. Wrapped in `<ScaledPage>`.
+- `leaderboard.tsx`: added `PageSkeleton` (no `ErrorState` needed — page fetches via its own useEffect, not useContent) to the existing `@/components/delta/ui` import; inserted `if (loading && apiData.length === 0) return <ScaledPage><PageSkeleton variant="list" /></ScaledPage>` after the `list` useMemo. Kept the existing empty state for `apiData.length === 0 && !loading`.
+- `live.tsx`: added `PageSkeleton, ErrorState` to the existing `@/components/delta/ui` import; inserted guards after the last hook (the `replay` useState) and before the main return. Used `variant="list"` per the spec. Wrapped in `<ScaledPage>`.
+- Verified: `tail -5 dev.log` shows multiple `✓ Compiled in Xms` entries with no errors after edits, and existing routes (`/api/community/live`, `/api/content/tests`, `/api/community/leaderboard`, `/api/content/subjects`, `/api/content/videos`, `/api/auth/me`) continue to return 200.
+
+Stage Summary:
+- 5 page files modified: library.tsx, tests.tsx, analytics.tsx, leaderboard.tsx, live.tsx. No other files touched.
+- All 4 `useContent()`-backed pages (library, tests, analytics, live) now show `<PageSkeleton>` while `content.loading` is true and `<ErrorState message={content.error} onRetry={content.refresh} />` if `content.error` is set. The retry button calls `content.refresh` to re-fetch.
+- The leaderboard page (which fetches directly from `/api/community/leaderboard` via its own useEffect) shows `<PageSkeleton variant="list" />` only while loading AND no data yet, preserving the existing empty state for the loaded-but-empty case.
+- Skeleton variants chosen per page context: grid (library, tests — card grids), charts (analytics — KPI + chart layout), list (leaderboard, live — row lists).
+- All guards are placed after the last hook in each component, preserving React's rules of hooks (no conditional hook calls).
+- dev.log confirms zero compile errors after all edits; existing API routes still respond 200.

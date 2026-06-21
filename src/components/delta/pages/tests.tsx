@@ -10,6 +10,7 @@ import {
 import {
   GlassCard, PrimaryButton, GhostButton, IconButton,
   ProgressRing, Badge, EmptyState,
+  PageSkeleton, ErrorState,
 } from '@/components/delta/ui'
 import { ScaledPage } from '@/components/delta/scaled-page'
 import { FilterBar } from '@/components/delta/global'
@@ -131,6 +132,16 @@ function AvailableView({ onStart, onHistory }: { onStart: (t: GeneratedTest) => 
       ),
     [tests, type, diff]
   )
+
+  // Show skeleton while loading
+  if (content.loading) {
+    return <PageSkeleton variant="grid" />
+  }
+
+  // Show error state if fetch failed
+  if (content.error) {
+    return <ErrorState message={content.error} onRetry={content.refresh} />
+  }
 
   return (
     <motion.div

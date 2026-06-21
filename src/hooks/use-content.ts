@@ -93,6 +93,7 @@ export interface GeneratedContent {
   scoreTrend: { test: string; score: number }[]
   leaderboard: ContentLeaderEntry[]
   loading: boolean
+  error: string | null
   refresh: () => void
 }
 
@@ -107,6 +108,7 @@ const EMPTY: GeneratedContent = {
   scoreTrend: [],
   leaderboard: [],
   loading: true,
+  error: null,
   refresh: () => {},
 }
 
@@ -161,10 +163,16 @@ export function useContent(): GeneratedContent {
         studyHours: [], // Empty until user has real study data
         scoreTrend: [], // Empty until user has real test history
         loading: false,
+        error: null,
         refresh: fetchAll,
       })
-    } catch {
-      setData({ ...EMPTY, loading: false, refresh: fetchAll })
+    } catch (err) {
+      setData({
+        ...EMPTY,
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to load content',
+        refresh: fetchAll,
+      })
     }
   }, [])
 
