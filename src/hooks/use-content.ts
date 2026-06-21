@@ -120,13 +120,26 @@ export function useContent(): GeneratedContent {
     setData((prev) => ({ ...prev, loading: true }))
 
     try {
-      // Fetch all content endpoints in parallel
+      // Fetch all content endpoints in parallel.
+      // Each fetch includes credentials so the auth cookie is sent.
+      // If any fetch fails or returns non-array data (e.g. 401), we get [].
+      const safeJson = async (url: string) => {
+        try {
+          const res = await fetch(url, { credentials: 'include' })
+          if (!res.ok) return []
+          const data = await res.json()
+          return Array.isArray(data) ? data : []
+        } catch {
+          return []
+        }
+      }
+
       const [subjectsRes, videosRes, testsRes, liveRes, leaderboardRes] = await Promise.all([
-        fetch('/api/content/subjects').then((r) => r.json()).catch(() => []),
-        fetch('/api/content/videos').then((r) => r.json()).catch(() => []),
-        fetch('/api/content/tests').then((r) => r.json()).catch(() => []),
-        fetch('/api/community/live').then((r) => r.json()).catch(() => []),
-        fetch('/api/community/leaderboard').then((r) => r.json()).catch(() => []),
+        safeJson('/api/content/subjects'),
+        safeJson('/api/content/videos'),
+        safeJson('/api/content/tests'),
+        safeJson('/api/community/live'),
+        safeJson('/api/community/leaderboard'),
       ])
 
       // Derive chapters from videos (group by chapterId)
