@@ -39,8 +39,13 @@ if not SECRET_KEY:
         raise RuntimeError("SECRET_KEY environment variable is required in production")
     SECRET_KEY = "delta-dev-secret-change-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
-REFRESH_TOKEN_EXPIRE_DAYS = 30  # refresh tokens last 30 days
+# Access tokens are short-lived (15 min) — when they expire, the client
+# transparently exchanges the refresh token for a new access+refresh pair.
+# This limits the blast radius of a stolen access token.
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
+# Refresh tokens are long-lived (30 days) — keep the user logged in across
+# sessions without re-entering credentials. Rotated on each refresh.
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 # CORS — only allow configured origins. NO wildcard in production.
 _default_origins = "http://localhost:3000,http://localhost:81,http://127.0.0.1:3000,http://127.0.0.1:81"

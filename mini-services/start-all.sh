@@ -9,10 +9,11 @@ RT_DIR="$PROJECT_DIR/mini-services/realtime"
 
 echo "Starting Delta backend services..."
 
-# Kill any existing instances
-pkill -f "mini-services/api/main.py" 2>/dev/null || true
-pkill -f "mini-services/realtime/index.ts" 2>/dev/null || true
-sleep 1
+# Kill any existing instances (match both relative and absolute path patterns)
+pkill -f "api/main.py" 2>/dev/null || true
+pkill -f "venv/bin/python main.py" 2>/dev/null || true
+pkill -f "realtime/index.ts" 2>/dev/null || true
+sleep 2
 
 # Start FastAPI (port 8000)
 echo "  FastAPI on :8000..."

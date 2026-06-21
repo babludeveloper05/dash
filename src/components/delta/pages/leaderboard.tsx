@@ -26,12 +26,16 @@ export function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const reduce = useReducedMotion() ?? false
 
-  // Fetch real leaderboard from the API
+  // Fetch real leaderboard from the API.
+  // The endpoint returns a paginated response { items, total, limit, offset };
+  // extract .items for the page. Falls back to the array itself if the
+  // response shape is ever a plain array (back-compat).
   useEffect(() => {
-    fetch('/api/community/leaderboard')
+    fetch('/api/community/leaderboard?limit=500')
       .then(r => r.json())
       .then(data => {
-        setApiData(data)
+        const items = Array.isArray(data) ? data : (data?.items ?? [])
+        setApiData(items)
         setLoading(false)
       })
       .catch(() => setLoading(false))

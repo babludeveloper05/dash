@@ -122,31 +122,35 @@ export function useContent(): GeneratedContent {
     try {
       // Fetch all content endpoints in parallel.
       // Each fetch includes credentials so the auth cookie is sent.
-      // If any fetch fails or returns non-array data (e.g. 401), we get [].
-      const safeJson = async (url: string) => {
+      // safeFetch returns the raw parsed JSON (array OR paginated object),
+      // or null on error. extractItems then normalizes to an array.
+      const safeFetch = async (url: string): Promise<unknown> => {
         try {
           const res = await fetch(url, { credentials: 'include' })
-          if (!res.ok) return []
-          const data = await res.json()
-          return Array.isArray(data) ? data : []
+          if (!res.ok) return null
+          return await res.json()
         } catch {
-          return []
+          return null
         }
       }
 
+      // Extract .items from a paginated response { items, total, limit, offset }.
+      // Falls back to the array itself (for non-paginated endpoints like subjects/live).
+      const extractItems = (d: unknown): unknown[] => {
+        if (Array.isArray(d)) return d
+        if (d && typeof d === 'object' && 'items' in (d as Record<string, unknown>)) {
+          const items = (d as { items: unknown[] }).items
+          return Array.isArray(items) ? items : []
+        }
+        return []
+      }
+
       const [subjectsRes, videosRes, testsRes, liveRes, leaderboardRes] = await Promise.all([
-        safeJson('/api/content/subjects'),
-        safeJson('/api/content/videos?limit=500').then((d: unknown) => {
-          // API returns { items, total, limit, offset } — extract items
-          if (Array.isArray(d)) return d
-          if (d && typeof d === 'object' && 'items' in (d as Record<string, unknown>)) {
-            return (d as { items: unknown[] }).items
-          }
-          return []
-        }),
-        safeJson('/api/content/tests'),
-        safeJson('/api/community/live'),
-        safeJson('/api/community/leaderboard'),
+        safeFetch('/api/content/subjects').then(extractItems),
+        safeFetch('/api/content/videos?limit=500').then(extractItems),
+        safeFetch('/api/content/tests?limit=500').then(extractItems),
+        safeFetch('/api/community/live').then(extractItems),
+        safeFetch('/api/community/leaderboard?limit=500').then(extractItems),
       ])
 
       // Derive chapters from videos (group by chapterId)

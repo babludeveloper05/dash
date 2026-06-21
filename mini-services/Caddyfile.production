@@ -1,0 +1,61 @@
+# Caddyfile for Project Delta — production HTTPS configuration.
+#
+# This is a REFERENCE configuration for production deployment. The dev sandbox
+# uses the HTTP-only Caddyfile at the project root (port 81).
+#
+# In production:
+#   1. Point your domain's DNS A record to this server.
+#   2. Replace "delta.example.com" with your actual domain.
+#   3. Caddy automatically provisions and renews Let's Encrypt certificates.
+#   4. HTTP (port 80) redirects to HTTPS (port 443).
+#   5. HSTS is set by the Next.js middleware (see src/middleware.ts).
+#   6. Auth cookies are marked Secure (see src/lib/server-auth.ts).
+
+delta.example.com {
+	# Encode responses for faster transfer
+	encode gzip zstd
+
+	# Security headers (complement the ones set by Next.js middleware)
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		# CSP — allow inline styles (Tailwind), scripts from self, data: images
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss:; frame-ancestors 'none'"
+		# HSTS is also set by Next.js middleware, but setting it here too ensures
+		# it's on every response (including static assets that skip the middleware).
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	}
+
+	# Gateway: forward XTransformPort query to a different backend port
+	# (used by mini-services like the socket.io realtime service on :3003)
+	@transform_port_query {
+		query XTransformPort=*
+	}
+	handle @transform_port_query {
+		reverse_proxy localhost:{query.XTransformPort} {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# Default: forward to the Next.js app (port 3000)
+	handle {
+		reverse_proxy localhost:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+}
+
+# HTTP → HTTPS redirect (port 80).
+# Caddy does this automatically when it sees an HTTPS site block, but being
+# explicit makes it clear. The redirect is permanent (301) so browsers cache it.
+:80 {
+	redir https://{host}{uri} 301
+}

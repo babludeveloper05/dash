@@ -1301,3 +1301,232 @@ Stage Summary:
 - Skeleton variants chosen per page context: grid (library, tests — card grids), charts (analytics — KPI + chart layout), list (leaderboard, live — row lists).
 - All guards are placed after the last hook in each component, preserving React's rules of hooks (no conditional hook calls).
 - dev.log confirms zero compile errors after all edits; existing API routes still respond 200.
+
+---
+Task ID: T22-refresh-tokens
+Agent: main (Z.ai Code)
+Task: #22 Refresh tokens — JWT access+refresh token pair with auto-refresh. Wire the existing backend refresh/blocklist into the Next.js proxy routes + client so the user stays logged in for 30 days without re-authenticating.
+
+Work Log:
+- Read `/home/z/my-project/worklog.md` (auth-ui-and-sync section) to understand the existing auth foundation: FastAPI already had access+refresh token creation + blocklist + /auth/refresh + /auth/logout endpoints; Next.js had login/register/logout/refresh/me proxy routes setting both cookies.
+- **Found and fixed a critical backend bug**: `mini-services/api/config.py` line 42 had `ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7` (7 days!) instead of `15` (15 min). This completely defeated the purpose of refresh tokens — the access token never expired during a session, so the refresh flow was never exercised. Fixed to `15`. Restarted FastAPI.
+- **Created `src/lib/server-auth.ts`** — the central server-side auth-refresh helper:
+  - `withAuthRefresh(req, makeRequest)`: tries the access token, on 401 exchanges the refresh token for a new pair via FastAPI `/api/auth/refresh`, retries the original request, returns `{ response, ctx: { accessToken, refreshToken, refreshed } }`.
+  - `forwardRotatedCookies(response, ctx)`: applies the new Set-Cookie headers to the caller's response if rotation happened.
+  - `readAuthCookies`, `applyRotatedCookies` helpers.
+- **Updated `/api/auth/me`**: now uses `withAuthRefresh` — auto-refreshes on expired access token instead of returning `{ user: null }`.
+- **Updated `/api/sync`**: now uses `withAuthRefresh` — sync keeps working for 30 days without re-auth.
+- **Updated all 5 content/community proxy routes** to use `withAuthRefresh`:
+  - `/api/content/subjects`, `/api/content/tests`, `/api/content/videos`, `/api/community/leaderboard`, `/api/community/live`
+  - These previously sent NO auth header to FastAPI (which requires auth) → 401 → pages showed empty data. Now they forward the access token from the cookie + auto-refresh on 401.
+- **Created `src/hooks/use-auth-refresh.ts`** — client-side proactive refresh hook:
+  - Schedules a refresh every 14 min (1 min before the 15-min access token expiry).
+  - Also refreshes on tab visibility change (covers backgrounded tabs) and on `online` event.
+  - Coalesces refresh calls (min 60s gap) + pauses if refresh returns 401 (refresh token expired).
+  - Mounted once in AppShell.
+- **Updated `src/adapters/api-client.ts`** — added 401 → refresh → retry logic:
+  - On any 401 (except from /auth/refresh itself), calls `/api/auth/refresh`, then retries the original request once.
+  - Single in-flight refresh promise — concurrent 401s share one refresh call.
+- **Wired `useAuthRefresh` into `src/components/delta/app-shell.tsx`** alongside useSync + useRealtime.
+- **Fixed a pre-existing sync 500 bug**: `DashboardComponent` had `id` as the sole primary key, but widget IDs like `w-greeting` are shared across all users → PK conflict when a second user syncs. Changed to composite PK `(id, user_id)`. Dropped + recreated the `dashboard_components` table.
+
+Verification (all via curl + Agent Browser):
+1. Register → access token now correctly expires in 15.0 min (was 7 days). ✓
+2. `/api/auth/me` with invalid access + valid refresh → auto-refreshes, returns user, sets new cookies (Max-Age=900 for access, Max-Age=2592000 for refresh). ✓
+3. Old refresh token after rotation → blocklisted (401). ✓
+4. Logout → both access AND refresh tokens blocklisted server-side (direct backend calls return 401). ✓
+5. `/api/auth/refresh` route → returns 200, sets new cookies, old refresh token invalidated. ✓
+6. Browser: login → nav shows "Sign out", `[sync] pulled server data` in console (no 500, no 401). ✓
+7. Library page → shows real subjects (Physics, Chemistry, Maths, Biology, CS) from authenticated API. ✓
+8. Leaderboard page → shows real entries (Karan Jain, Riya Chopra, etc.) from authenticated API. ✓
+9. Logout in browser → cookies cleared, nav shows "Sign in". ✓
+10. Content/community API without auth → 401 (expected; useContent handles gracefully with empty arrays). ✓
+11. Second user syncs same shared widget IDs (w-greeting, w-live) → 200, no PK conflict. ✓
+
+Stage Summary:
+- 1 new file: `src/lib/server-auth.ts` (server-side auth-refresh helper).
+- 1 new file: `src/hooks/use-auth-refresh.ts` (client-side proactive refresh).
+- 7 modified files: `config.py` (15-min access token fix), `models.py` (composite PK), `me/route.ts`, `sync/route.ts`, `subjects/route.ts`, `tests/route.ts`, `videos/route.ts`, `leaderboard/route.ts`, `live/route.ts` (all use withAuthRefresh), `api-client.ts` (401 retry), `app-shell.tsx` (mount useAuthRefresh).
+- The auth+sync loop is now complete: register/login → 15-min access + 30-day refresh cookies → auto-refresh before expiry (proactive) + on 401 (reactive) → logout blocklists both tokens server-side. Users stay logged in for 30 days without re-authenticating; stolen access tokens expire in 15 min; logout immediately invalidates both tokens.
+- Bonus: fixed the sync 500 (DashboardComponent PK conflict) that had been silently breaking sync since the multi-user testing phase.
+
+---
+Task ID: T25-logout-blocklist
+Agent: main (Z.ai Code)
+Task: #25 Server-side token invalidation on logout — verify the existing blocklist actually rejects subsequent requests with the blocklisted tokens.
+
+Work Log:
+- The backend `auth.py` already had a `_token_blocklist: dict[str, datetime]` + `blocklist_token()` + `decode_access_token`/`decode_refresh_token` check the blocklist.
+- The `logout_user(access_token, refresh_token)` service function calls `blocklist_token()` on both.
+- The `/api/auth/logout` route requires the access token (Bearer) and optionally accepts the refresh token in the body — both get blocklisted.
+- The Next.js `/api/auth/logout` proxy forwards both tokens to FastAPI's logout endpoint, then clears both cookies.
+
+Verification (curl, direct against FastAPI to bypass cookie clearing):
+1. Register user → get access + refresh tokens.
+2. `/api/auth/me` with access token → 200 (user returned). ✓
+3. Call `/api/auth/logout` with both tokens. ✓
+4. `/api/auth/me` with the SAME access token → 401 (blocklisted). ✓
+5. `/api/auth/refresh` with the SAME refresh token → 401 (blocklisted). ✓
+6. Browser logout → cookies cleared, nav shows "Sign in", subsequent content API calls return 401 (no valid token). ✓
+
+Stage Summary:
+- No code changes needed — the blocklist was already implemented in the backend. This task was verification-only, confirming the blocklist works end-to-end for both access and refresh tokens after logout.
+- The blocklist is in-memory (per-process). For multi-process production, this should be moved to Redis. Documented in the `auth.py` docstring.
+
+---
+Task ID: T13-pagination
+Agent: main (Z.ai Code)
+Task: #13 Pagination on content API — add limit/offset pagination to all list endpoints that could grow large.
+
+Work Log:
+- Audited all content/community list endpoints:
+  - `/api/content/videos` — already had limit/offset in the router, but the service fetched ALL rows then sliced in Python (inefficient). Fixed to paginate at the DB level.
+  - `/api/content/tests` — returned all tests as a flat array. Added limit/offset params + `{items, total, limit, offset}` response.
+  - `/api/community/leaderboard` — had `limit` but no `offset`, returned a flat array. Added offset + `{items, total, limit, offset}` response.
+  - `/api/content/subjects` — only 6 rows, bounded. No pagination needed (left as flat array).
+  - `/api/community/live` — small bounded set. No pagination needed (left as flat array).
+  - `/api/content/tests/{id}/questions` — bounded by test question count (~30). No pagination needed.
+- **Backend changes**:
+  - `services/content_service.py`: `get_videos()` and `get_tests()` and `get_leaderboard()` now accept `limit`/`offset` and return `(items, total_count)` tuples. DB-level pagination via `.offset().limit()` + a separate `COUNT(*)` query for total.
+  - `routers/content.py`: `/videos` and `/tests` return `{items, total, limit, offset}`. Videos router no longer slices in Python (delegates to service).
+  - `routers/community.py`: `/leaderboard` accepts `limit` + `offset` query params, returns `{items, total, limit, offset}`.
+- **Next.js proxy changes**:
+  - `/api/content/tests/route.ts`: now forwards `limit` + `offset` query params (previously only forwarded subject+type).
+  - `/api/community/leaderboard/route.ts`: now forwards `limit` + `offset` query params.
+  - `/api/content/videos/route.ts`: already forwarded limit+offset (done in T22 work).
+- **Client changes** (`src/hooks/use-content.ts`):
+  - Renamed `safeJson` → `safeFetch` which returns the raw parsed JSON (array OR paginated object) instead of forcing arrays. Previously, paginated objects were discarded by `Array.isArray(data) ? data : []`.
+  - Added `extractItems()` helper that extracts `.items` from `{items, total, limit, offset}` or falls back to the array itself for non-paginated endpoints (subjects, live).
+  - All 5 endpoints now go through `safeFetch().then(extractItems)`.
+  - Fetch URLs updated to include `?limit=500` for tests and leaderboard (was missing).
+
+Verification (curl + Agent Browser):
+1. Videos: `limit=2&offset=0` → 2 items, total=360. `offset=2` → different items. ✓
+2. Tests: `limit=2&offset=0` → 2 items, total=54. `offset=2` → different items. ✓
+3. Leaderboard: `limit=3&offset=0` → 3 items, total=100. `offset=3` → different items. ✓
+4. Browser: Tests page shows real test cards (Full Syllabus 01 — Biology, Chapter Test 02 — Biology, Previous Year 03 — English) with type filters. ✓
+5. Browser: Library page shows 5 subjects (Physics/Chemistry/Maths/Biology/CS) each with 60 videos. ✓
+6. Browser: Leaderboard page shows real entries (Karan Jain, Riya Chopra, etc.). ✓
+7. Dev log: all content/community API calls return 200, no errors. ✓
+
+Stage Summary:
+- 3 backend files modified: `content_service.py`, `routers/content.py`, `routers/community.py`.
+- 2 Next.js proxy routes updated: `content/tests`, `community/leaderboard`.
+- 1 client hook updated: `use-content.ts` (safeFetch + extractItems for paginated responses).
+- All list endpoints that could grow large (videos: 360, tests: 54, leaderboard: 100) now support proper DB-level pagination with `{items, total, limit, offset}` metadata. The client can implement infinite scroll / "load more" using these params.
+- Small bounded endpoints (subjects: 6, live sessions: ~6, questions: ~30/test) intentionally left as flat arrays — pagination adds overhead without benefit at these sizes.
+
+---
+Task ID: T3-csrf
+Agent: main (Z.ai Code)
+Task: #3 CSRF protection — prevent cross-site request forgery on all state-changing endpoints.
+
+Work Log:
+- Audited the CSRF threat model:
+  - Auth cookies already use `sameSite: 'lax'` (set in T22 work) — this blocks cross-site POST/PUT/DELETE from sending cookies, which is the primary CSRF defense.
+  - However, SameSite=Lax allows top-level GET navigations with cookies, and very old browsers may not support SameSite. Defense-in-depth needed.
+- **Created `src/lib/csrf.ts`** — Origin header verification helper:
+  - `checkCsrf(req)` — for state-changing methods (POST/PUT/PATCH/DELETE), verifies the `Origin` (or `Referer` fallback) header matches an allowed origin. Rejects with 403 if missing or mismatched.
+  - GET/HEAD/OPTIONS are exempt (must be idempotent).
+  - Allowed origins from `CSRF_ALLOWED_ORIGINS` env var (comma-separated); defaults to `http://localhost:3000` + `http://127.0.0.1:3000` in dev.
+  - Chose Origin check over double-submit cookies because: (1) SameSite=Lax already provides the cookie-based defense, (2) Origin check is simpler (no token management), (3) Origin headers cannot be spoofed cross-site by JavaScript.
+- **Applied `checkCsrf` to all 6 state-changing routes**:
+  - `POST /api/auth/login`
+  - `POST /api/auth/register`
+  - `POST /api/auth/logout`
+  - `POST /api/auth/refresh`
+  - `POST /api/sync`
+  - `POST /api/doubts/ask`
+- Also fixed the `register/route.ts` file which had a stray `import { config }` at the BOTTOM of the file (line 32) — moved to top with other imports.
+
+Verification (curl):
+1. POST with correct Origin (`http://localhost:3000`) → 200 (login succeeds). ✓
+2. POST with wrong Origin (`https://evil.com`) → 403 "Cross-site request blocked". ✓
+3. POST with NO Origin header → 403 "Missing Origin header". ✓
+4. GET request → 200 (not CSRF-checked, idempotent). ✓
+
+Verification (Agent Browser):
+5. Login via browser (same-origin fetch auto-sends Origin header) → 200, nav shows "Sign out". ✓
+6. Sync POSTs → `[sync] pulled server data` in console (no 403). ✓
+7. Logout POST → 200, nav shows "Sign in". ✓
+8. No 403 errors in dev log for legitimate requests. ✓
+
+Stage Summary:
+- 1 new file: `src/lib/csrf.ts` (Origin header verification).
+- 6 route files modified: all POST routes now call `checkCsrf(req)` at the top.
+- 2 layers of CSRF defense: (1) SameSite=Lax cookies block cross-site cookie submission, (2) Origin header check blocks requests from wrong origins even if cookies somehow leak.
+- Production: set `CSRF_ALLOWED_ORIGINS=https://yourdomain.com` env var to lock down to the real origin.
+
+---
+Task ID: T9-https
+Agent: main (Z.ai Code)
+Task: #9 HTTPS enforcement — redirect HTTP to HTTPS, set HSTS, mark cookies Secure in production.
+
+Work Log:
+- Audited the current setup: Caddy gateway on port 81 (HTTP only in sandbox), no HTTPS redirect, no HSTS, cookies without `Secure` flag.
+- **Created `src/middleware.ts`** — Next.js middleware that runs on every request:
+  - **HTTPS redirect** (production only): if `NODE_ENV=production` and the request is HTTP (detected via `X-Forwarded-Proto` header or URL protocol), returns a 301 redirect to the HTTPS equivalent.
+  - **HSTS** (production HTTPS only): sets `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` so browsers never attempt HTTP again for 2 years.
+  - **Security headers** (all environments): X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Referrer-Policy: strict-origin-when-cross-origin, Permissions-Policy: geolocation=(), microphone=(), camera=().
+  - Matcher excludes static assets (_next/static, _next/image, favicon, images) for performance.
+  - Aliased the `config` import as `appConfig` to avoid a naming conflict with the exported `config` const (Next.js middleware matcher config).
+- **Updated cookie settings** in 4 files to use `secure: config.isProduction`:
+  - `src/lib/server-auth.ts` (COOKIE_OPTS used by withAuthRefresh)
+  - `src/app/api/auth/login/route.ts`
+  - `src/app/api/auth/register/route.ts`
+  - `src/app/api/auth/refresh/route.ts`
+  - In production (HTTPS), cookies are marked Secure so they're never sent over plain HTTP. In dev (localhost HTTP), Secure is omitted so cookies actually work.
+- **Created `mini-services/Caddyfile.production`** — reference Caddy config for production HTTPS:
+  - Automatic Let's Encrypt cert provisioning via Caddy's built-in ACME client.
+  - HTTP→HTTPS redirect on port 80.
+  - HSTS + full security header suite (complements the Next.js middleware).
+  - Preserves the XTransformPort gateway pattern for mini-services.
+- **Fixed a collateral bug** in `leaderboard.tsx`: the page fetched `/api/community/leaderboard` directly (not via useContent) and did `setApiData(data)`, but the T13 pagination change made the response `{items, total, ...}` instead of an array → crash. Fixed to extract `.items` with array fallback.
+
+Verification:
+1. Dev mode: no HTTPS redirect (localhost HTTP works). ✓
+2. Security headers present on all routes (page + API): X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy. ✓
+3. No HSTS in dev (correct — would lock out localhost HTTP). ✓
+4. Login still works in dev (Secure cookies not enforced over HTTP). ✓
+5. All pages load without errors (Library, Tests, Notes, Live, Analytics, Ranks, Wins). ✓
+6. Leaderboard page fixed — shows real data after the `.items` extraction fix. ✓
+7. Console: no errors after full page sweep. ✓
+
+Stage Summary:
+- 1 new file: `src/middleware.ts` (HTTPS redirect + HSTS + security headers).
+- 1 new file: `mini-services/Caddyfile.production` (reference production HTTPS config).
+- 4 files modified for `secure: config.isProduction` cookie flag: server-auth.ts, login, register, refresh routes.
+- 1 collateral fix: leaderboard.tsx (extract .items from paginated response).
+- Production deployment: set `NODE_ENV=production`, point DNS to the server, use Caddyfile.production → Caddy auto-provisions HTTPS certs, HTTP redirects to HTTPS, HSTS locks browsers to HTTPS, cookies are Secure. The Next.js middleware adds defense-in-depth security headers that work even if the reverse proxy doesn't set them.
+
+---
+Task ID: ALL-TASKS-COMPLETE
+Agent: main (Z.ai Code)
+Task: Final summary of all 5 completed auth/security tasks.
+
+Work Log:
+- Completed all 5 high-priority auth/security tasks from the todo list:
+  - T22: Refresh tokens (JWT access+refresh pair with auto-refresh)
+  - T25: Server-side token invalidation on logout (blocklist verification)
+  - T13: Pagination on content API (limit/offset on videos/tests/leaderboard)
+  - T3: CSRF protection (Origin header check + SameSite=Lax cookies)
+  - T9: HTTPS enforcement (middleware redirect + HSTS + Secure cookies)
+
+Final verification (Agent Browser, full flow):
+1. Opened app → onboarding → skipped → guest mode (Sign in button visible). ✓
+2. Clicked Sign in → auth modal → switched to Sign up → filled form → registered → nav showed Sign out. ✓
+3. Console: `[sync] pulled server data` — sync working. ✓
+4. Navigated Library → real subjects (Physics, Chemistry, Maths, Biology, CS) with 60 videos each. ✓
+5. Navigated Tests → real test cards (Full Syllabus, Chapter Test, Previous Year, Mock Test). ✓
+6. Navigated Leaderboard → real entries (Karan Jain, Riya Chopra, etc.) with podium. ✓
+7. Navigated Analytics, Notes, Live, Wins — all loaded without errors. ✓
+8. Logged out → cookies cleared, nav showed Sign in. ✓
+9. No console errors on any page. ✓
+10. Dev log: all API routes returning 200, no 500s, no 403s on legitimate requests. ✓
+
+Stage Summary:
+- Total new files: 4 (server-auth.ts, csrf.ts, middleware.ts, use-auth-refresh.ts, Caddyfile.production)
+- Total modified files: ~15 (backend config/models/services/routers, Next.js proxy routes, client hooks/adapters/components)
+- The app now has production-grade auth security: 15-min access tokens, 30-day refresh tokens with rotation, server-side blocklist on logout, CSRF protection, HTTPS enforcement with HSTS, Secure cookies, and proper pagination on all list endpoints.
+- Backend services (FastAPI :8000, Socket.io :3003) running persistently via start-all.sh.
+- Next.js dev server (:3000) running cleanly with no compile errors.

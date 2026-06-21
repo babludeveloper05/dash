@@ -1,5 +1,5 @@
 """Community router — thin handlers calling content_service. All require auth."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -10,10 +10,20 @@ router = APIRouter(prefix="/community", tags=["community"], dependencies=[Depend
 
 
 @router.get("/leaderboard")
-def leaderboard(limit: int = 1000, db: Session = Depends(get_db)):
-    entries = get_leaderboard(limit, db)
-    return [{"id": e.id, "name": e.name, "score": e.score,
-             "streak": e.streak, "change": e.change, "batch": e.batch, "rank": e.rank} for e in entries]
+def leaderboard(
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Returns paginated leaderboard entries. Use limit + offset for pagination."""
+    entries, total = get_leaderboard(limit, offset, db)
+    return {
+        "items": [{"id": e.id, "name": e.name, "score": e.score,
+                   "streak": e.streak, "change": e.change, "batch": e.batch, "rank": e.rank} for e in entries],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/live")

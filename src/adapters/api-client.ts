@@ -11,6 +11,7 @@ import { config } from '@/config'
  *  - JSON parsing
  *  - URL construction
  *  - Auth (cookies are sent automatically by the browser)
+ *  - 401 → refresh → retry (one automatic retry per request)
  *
  * Usage:
  *   const subjects = await api.get('/content/subjects')
@@ -28,13 +29,33 @@ export class ApiError extends Error {
   }
 }
 
+// Single in-flight refresh promise — concurrent 401s share one refresh.
+let refreshPromise: Promise<boolean> | null = null
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch('/api/auth/refresh', { method: 'POST' })
+      return res.ok
+    } catch {
+      return false
+    } finally {
+      // Allow the next refresh attempt after this one settles.
+      // Small delay to coalesce bursts.
+      setTimeout(() => { refreshPromise = null }, 1000)
+    }
+  })()
+  return refreshPromise
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
   const url = `${config.apiBase}${path}`
 
-  const res = await fetch(url, {
+  const doFetch = () => fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -42,8 +63,20 @@ async function request<T>(
     },
   })
 
+  let res = await doFetch()
+
   // Handle empty responses (204 No Content)
   if (res.status === 204) return undefined as T
+
+  // On 401, attempt a single refresh + retry. The refresh route rotates both
+  // httpOnly cookies server-side, so the retry automatically picks them up.
+  if (res.status === 401 && !path.startsWith('/auth/refresh')) {
+    const refreshed = await refreshAccessToken()
+    if (refreshed) {
+      res = await doFetch()
+      if (res.status === 204) return undefined as T
+    }
+  }
 
   const data = await res.json().catch(() => null)
 

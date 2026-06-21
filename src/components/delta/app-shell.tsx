@@ -32,6 +32,7 @@ import { AuthModal } from './auth-modal'
 import { OfflineBanner } from './offline-banner'
 import { useSync } from '@/adapters/sync-engine'
 import { useRealtime } from '@/lib/realtime'
+import { useAuthRefresh } from '@/hooks/use-auth-refresh'
 
 function ActivePage() {
   const tab = useStore((s) => s.activeTab)
@@ -68,6 +69,10 @@ export function AppShell() {
   // Realtime connects to the socket.io service for live updates.
   useSync()
   useRealtime()
+  // Proactively refresh the access token before it expires (every 14 min),
+  // plus on tab focus / reconnect — keeps the user logged in for up to 30
+  // days without re-authenticating.
+  useAuthRefresh()
 
   // On mount, check if the user is logged in (reads the httpOnly cookie via
   // the /api/auth/me proxy). If logged in, populate authUser so the nav shows

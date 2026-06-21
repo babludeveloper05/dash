@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ZAI from 'z-ai-web-dev-sdk'
+import { checkCsrf } from '@/lib/csrf'
 
 export const runtime = 'nodejs'
 // Doubt-solving is a per-request AI call — never cache.
@@ -50,6 +51,9 @@ function sanitizeSubjects(v: unknown): string[] {
  * The z-ai-web-dev-sdk is used server-side only (per SDK contract).
  */
 export async function POST(req: NextRequest) {
+  const csrfError = checkCsrf(req)
+  if (csrfError) return csrfError
+
   let body: AskBody
   try {
     body = (await req.json()) as AskBody

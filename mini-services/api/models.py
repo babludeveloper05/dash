@@ -232,11 +232,17 @@ class TestAttempt(Base):
 # --- Dashboard layout -------------------------------------------------------
 
 class DashboardComponent(Base):
-    """Dashboard component positions (the free-form canvas layout)."""
+    """Dashboard component positions (the free-form canvas layout).
+
+    Composite PK (user_id, id) — the client-defined widget IDs (e.g.
+    "w-greeting") are shared across users, so the user_id must be part of
+    the key to avoid conflicts when multiple users sync the same default
+    widget set.
+    """
     __tablename__ = "dashboard_components"
 
     id = Column(String, primary_key=True)  # "w-greeting" etc. (client-defined)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True, nullable=False)
     type = Column(String, nullable=False)
     x = Column(Integer, default=0)
     y = Column(Integer, default=0)

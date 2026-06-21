@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { config } from '@/config'
+import { checkCsrf } from '@/lib/csrf'
 
 /**
  * POST /api/auth/logout
@@ -7,6 +8,9 @@ import { config } from '@/config'
  * Then clears both cookies.
  */
 export async function POST(req: NextRequest) {
+  const csrfError = checkCsrf(req)
+  if (csrfError) return csrfError
+
   const accessToken = req.cookies.get('delta-token')?.value
   const refreshToken = req.cookies.get('delta-refresh')?.value
 

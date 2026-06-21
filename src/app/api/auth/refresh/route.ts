@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { config } from '@/config'
+import { checkCsrf } from '@/lib/csrf'
 
 /**
  * POST /api/auth/refresh
@@ -7,6 +8,9 @@ import { config } from '@/config'
  * Called automatically when the access token expires (15 min).
  */
 export async function POST(req: NextRequest) {
+  const csrfError = checkCsrf(req)
+  if (csrfError) return csrfError
+
   const refreshToken = req.cookies.get('delta-refresh')?.value
   if (!refreshToken) {
     return NextResponse.json({ error: 'No refresh token' }, { status: 401 })
@@ -25,9 +29,11 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({ ok: true })
     response.cookies.set('delta-token', data.access_token, {
       httpOnly: true, sameSite: 'lax', maxAge: 60 * 15, path: '/',
+      secure: config.isProduction,
     })
     response.cookies.set('delta-refresh', data.refresh_token, {
       httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 30, path: '/',
+      secure: config.isProduction,
     })
     return response
   } catch {
