@@ -13,11 +13,14 @@ Dev: SQLite (./dev.db) — zero-config.
 Prod: set DATABASE_URL=postgresql://... for Postgres.
 """
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from config import CORS_ORIGINS
-from database import engine, Base
+from database import engine, Base, get_db, SessionLocal
 from routers import auth, sync, notes, community, content
 
 # Create tables on startup (SQLite/Postgres compatible).
@@ -48,7 +51,21 @@ app.include_router(content.router, prefix="/api")
 
 @app.get("/")
 def health():
+    """Liveness check — service is alive."""
     return {"status": "ok", "service": "delta-api", "port": 8000}
+
+
+@app.get("/ready")
+def ready(db: Session = Depends(get_db)):
+    """Readiness check — service is ready (DB connected)."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "connected"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "database": "error", "detail": str(e)},
+        )
 
 
 @app.get("/api")

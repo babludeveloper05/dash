@@ -29,6 +29,7 @@ import {
 } from '@/lib/motion'
 import { ThemeVars } from './theme-vars'
 import { AuthModal } from './auth-modal'
+import { OfflineBanner } from './offline-banner'
 import { useSync } from '@/adapters/sync-engine'
 import { useRealtime } from '@/lib/realtime'
 
@@ -170,6 +171,7 @@ export function AppShell() {
         aria-hidden
       />
       <TopNav />
+      <OfflineBanner />
       {/*
         3D perspective container — wraps AnimatePresence so translateZ on the
         pages creates real depth (the camera-move effect). perspective: 1200px
