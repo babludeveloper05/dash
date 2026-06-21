@@ -21,15 +21,26 @@ if _raw_db_url.startswith("file:"):
     _raw_db_url = f"sqlite:///{_path}"
 DATABASE_URL = _raw_db_url
 
+# Validate DATABASE_URL format — fail fast with a clear error.
+if not DATABASE_URL.startswith(("sqlite:///", "postgresql://", "postgresql+psycopg://")):
+    raise RuntimeError(
+        f"DATABASE_URL must start with 'sqlite:///' or 'postgresql://'. "
+        f"Got: {DATABASE_URL[:50]}..."
+    )
+
+# Is this a production environment?
+IS_PRODUCTION = os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production"
+
 # JWT settings for auth tokens.
 # In production, SECRET_KEY MUST be set via environment variable — no default.
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
-    if os.environ.get("NODE_ENV") == "production" or os.environ.get("ENV") == "production":
+    if IS_PRODUCTION:
         raise RuntimeError("SECRET_KEY environment variable is required in production")
     SECRET_KEY = "delta-dev-secret-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+REFRESH_TOKEN_EXPIRE_DAYS = 30  # refresh tokens last 30 days
 
 # CORS — only allow configured origins. NO wildcard in production.
 _default_origins = "http://localhost:3000,http://localhost:81,http://127.0.0.1:3000,http://127.0.0.1:81"
@@ -38,3 +49,13 @@ CORS_ORIGINS = [
     for origin in os.environ.get("CORS_ORIGINS", _default_origins).split(",")
     if origin.strip()
 ]
+
+# Rate limiting config
+AUTH_RATE_LIMIT = int(os.environ.get("AUTH_RATE_LIMIT", "5"))  # 5 requests per window
+AUTH_RATE_WINDOW = int(os.environ.get("AUTH_RATE_WINDOW", "60"))  # 60 seconds
+AI_RATE_LIMIT = int(os.environ.get("AI_RATE_LIMIT", "20"))  # 20 requests per window
+AI_RATE_WINDOW = int(os.environ.get("AI_RATE_WINDOW", "60"))  # 60 seconds
+
+# Account lockout config
+MAX_LOGIN_ATTEMPTS = int(os.environ.get("MAX_LOGIN_ATTEMPTS", "5"))
+LOCKOUT_DURATION_MINUTES = int(os.environ.get("LOCKOUT_DURATION_MINUTES", "15"))

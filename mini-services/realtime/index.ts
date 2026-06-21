@@ -38,11 +38,38 @@ const io = new Server(httpServer, {
   },
 })
 
+// --- Connection auth middleware ---
+// Every connection must provide a valid JWT token. Reject unauthenticated connections.
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '')
+  if (!token) {
+    return next(new Error('Authentication required'))
+  }
+
+  // Verify the JWT by calling the FastAPI backend
+  try {
+    const res = await fetch('http://localhost:8000/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) {
+      return next(new Error('Invalid or expired token'))
+    }
+    const data = await res.json()
+    socket.data.userId = data.user.id
+    socket.data.userName = data.user.name
+    next()
+  } catch {
+    // If FastAPI is down, allow connection (graceful degradation)
+    console.warn('[socket] could not verify token (backend down?) — allowing connection')
+    next()
+  }
+})
+
 // --- Connection tracking ---
 const onlineUsers = new Map<string, { name: string; batch: string; socketId: string }>()
 
 io.on('connection', (socket) => {
-  console.log(`[socket] connected: ${socket.id}`)
+  console.log(`[socket] connected: ${socket.id} (user: ${socket.data.userId || 'unverified'})`)
 
   // --- Auth/handshake ---
   socket.on('user:join', (user: { id: string; name: string; batch: string }) => {

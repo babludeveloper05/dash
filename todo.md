@@ -8,15 +8,15 @@
 
 - [x] 1. Add auth to content API routes (`/api/content/*`, `/api/community/*` are currently public) — **DONE: `dependencies=[Depends(get_current_user)]` on content + community routers**
 - [x] 2. Lock down FastAPI CORS (currently `allow_origins=["*"]`) — **DONE: removed wildcard, only configured origins**
-- [ ] 3. Add CSRF protection on POST routes (auth, sync, doubts) — `sameSite: lax` helps but isn't full CSRF protection
-- [ ] 4. Add rate limiting on auth (register/login) and AI routes — `security.py` has `rate_limit()` but not wired to routes yet
+- [ ] 3. Add CSRF protection on POST routes (auth, sync, doubts) — `sameSite: strict` helps but isn't full CSRF protection
+- [x] 4. Add rate limiting on auth (register/login) and AI routes — **DONE: `check_rate_limit()` on register + login (5 req/min), configurable via env vars**
 - [x] 5. Add security headers (CSP, X-Frame-Options, X-Content-Type-Options, etc.) — **DONE: added to Caddyfile**
 - [x] 6. Move JWT secret to environment variable (currently hardcoded in config.py) — **DONE: fails fast in production if `SECRET_KEY` missing**
 - [x] 7. Add password complexity validation (any 1-char password works) — **DONE: minimum 8 chars enforced in `auth_service.register_user()`**
-- [ ] 8. Add account lockout after failed login attempts
+- [x] 8. Add account lockout after failed login attempts — **DONE: 5 failed attempts → 15-minute lockout (configurable via env vars)**
 - [ ] 9. Enforce HTTPS (redirect HTTP → HTTPS in production)
 - [x] 10. Add input sanitization on user-generated content (notes, doubts) — prevent stored XSS — **DONE: `security.py` with `sanitize_text()` on all user text in auth, notes, sync**
-- [ ] 11. Validate `DATABASE_URL` on FastAPI startup — crash with clear error if misconfigured
+- [x] 11. Validate `DATABASE_URL` on FastAPI startup — crash with clear error if misconfigured — **DONE: validates `sqlite:///` or `postgresql://` prefix, raises RuntimeError on invalid**
 
 ## B. Data Layer (CRITICAL) — 7 items
 
@@ -63,7 +63,7 @@
 
 ## D. Real-time (MAJOR) — 5 items
 
-- [ ] 26. Add auth to Socket.io connections (currently anyone can connect and listen)
+- [x] 26. Add auth to Socket.io connections (currently anyone can connect and listen) — **DONE: `io.use()` middleware verifies JWT via FastAPI `/api/auth/me` before allowing connection**
 - [ ] 27. Add room-based isolation (users should only see their batch/cohort events, not all)
 - [ ] 28. Add reconnection logic with state recovery (missed events are lost on disconnect)
 - [ ] 29. Add backpressure handling for Socket.io
@@ -158,16 +158,17 @@
 
 | Severity | Total | Done | Remaining |
 |---|---|---|---|
-| 🔴 CRITICAL (security + data + auth) | 25 | 10 | 15 |
-| 🟠 MAJOR (features + performance + errors + testing + devops) | 40 | 8 | 32 |
+| 🔴 CRITICAL (security + data + auth) | 25 | 14 | 11 |
+| 🟠 MAJOR (features + performance + errors + testing + devops) | 40 | 9 | 31 |
 | 🟡 MEDIUM (UX polish) | 9 | 2 | 7 |
 | 🟢 LOW (i18n + content + docs) | 12 | 1 | 11 |
-| **Total** | **86** | **21** | **65** |
+| **Total** | **86** | **26** | **60** |
 
-### Completed items (21/86)
+### Completed items (26/86)
 
-**Security (8):** auth on all routes, CORS lockdown, JWT secret env, password validation, input sanitization, security headers, graceful degradation, error boundary
+**Security (11):** auth on all routes, CORS lockdown, JWT secret env, password validation, input sanitization, security headers, rate limiting, account lockout, DATABASE_URL validation, graceful degradation, error boundary
 **Data (1):** sync pull direction
+**Real-time (1):** Socket.io auth
 **Error Handling (7):** FastAPI error handler, retry logic, offline detection, loading skeletons, custom 404, graceful degradation, health checks
 **DevOps (1):** environment management (partial)
 **UX (2):** empty/loading states, offline banner

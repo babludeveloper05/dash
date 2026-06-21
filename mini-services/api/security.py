@@ -19,35 +19,21 @@ from fastapi import HTTPException, Request, status
 _rate_store: dict[str, list[float]] = defaultdict(list)
 
 
-def rate_limit(max_requests: int, window_seconds: int):
-    """Decorator factory for rate limiting.
-    Usage: @rate_limit(max_requests=5, window_seconds=60)
+def check_rate_limit(ip: str, max_requests: int, window_seconds: int) -> bool:
+    """Check if the IP is within the rate limit. Returns True if allowed.
+
+    Call this at the start of a route handler:
+        if not check_rate_limit(request.client.host, 5, 60):
+            raise HTTPException(429, "Rate limit exceeded")
     """
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            # Extract the request to get the client IP
-            request: Request | None = kwargs.get('request')
-            if not request:
-                for arg in args:
-                    if isinstance(arg, Request):
-                        request = arg
-                        break
-            ip = request.client.host if request and request.client else 'unknown'
+    now = time.time()
+    _rate_store[ip] = [t for t in _rate_store[ip] if now - t < window_seconds]
 
-            now = time.time()
-            # Clean old entries
-            _rate_store[ip] = [t for t in _rate_store[ip] if now - t < window_seconds]
+    if len(_rate_store[ip]) >= max_requests:
+        return False
 
-            if len(_rate_store[ip]) >= max_requests:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Rate limit exceeded: {max_requests} requests per {window_seconds}s",
-                )
-
-            _rate_store[ip].append(now)
-            return await func(*args, **kwargs)
-        return wrapper
-    return decorator
+    _rate_store[ip].append(now)
+    return True
 
 
 # --- Input sanitization ---
