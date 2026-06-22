@@ -1,8 +1,8 @@
-"""Auth router — register, login, refresh, logout, me. Rate limited + CSRF protected."""
+"""Auth router — register, login, refresh, logout, me, password reset, email verification. Rate limited + CSRF protected."""
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from database import get_db
 from models import User
@@ -10,6 +10,7 @@ from schemas import UserCreate, UserLogin, Token, UserOut
 from services.auth_service import (
     register_user, login_user, verify_token,
     refresh_access_token, logout_user,
+    verify_email, request_password_reset, reset_password,
 )
 from security import check_rate_limit
 from csrf import csrf_protect
@@ -28,6 +29,19 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 class RefreshRequest(BaseModel):
     refresh_token: str | None = None
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
 
 
 @router.post("/register", response_model=Token)
@@ -81,3 +95,36 @@ def logout(
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
     return user
+
+
+@router.post("/verify-email")
+def verify_email_endpoint(body: VerifyEmailRequest, db: Session = Depends(get_db), _ = Depends(csrf_protect)):
+    """Verify email address with token."""
+    success = verify_email(body.token, db)
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    return {"ok": True, "detail": "Email verified successfully"}
+
+
+@router.post("/forgot-password")
+def forgot_password(request: Request, body: PasswordResetRequest, db: Session = Depends(get_db), _ = Depends(csrf_protect)):
+    """Request password reset email."""
+    ip = request.client.host if request.client else 'unknown'
+    if not check_rate_limit(ip, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW):
+        raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Max {AUTH_RATE_LIMIT} requests per {AUTH_RATE_WINDOW}s.")
+    
+    # Always return success to prevent email enumeration
+    request_password_reset(body.email, db)
+    return {"ok": True, "detail": "If the email exists, a reset link has been sent"}
+
+
+@router.post("/reset-password")
+def reset_password_endpoint(body: PasswordResetConfirm, db: Session = Depends(get_db), _ = Depends(csrf_protect)):
+    """Reset password with token."""
+    try:
+        success = reset_password(body.token, body.new_password, db)
+        if not success:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+        return {"ok": True, "detail": "Password reset successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

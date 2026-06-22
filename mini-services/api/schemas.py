@@ -115,3 +115,32 @@ class DoubtOut(BaseModel):
 
 
 Token.model_rebuild()
+
+
+# --- Notifications ---
+
+class NotificationCreate(BaseModel):
+    user_id: str
+    title: str
+    message: str
+    type: str
+    link: Optional[str] = None
+
+class NotificationUpdate(BaseModel):
+    is_read: Optional[bool] = None
+    title: Optional[str] = None
+    message: Optional[str] = None
+
+class NotificationResponse(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    message: str
+    type: str
+    link: Optional[str] = None
+    is_read: bool
+    created_at: datetime
+    read_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

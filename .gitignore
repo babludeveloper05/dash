@@ -20,7 +20,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual Environment
 venv/
@@ -29,13 +28,8 @@ env/
 .venv/
 .env/
 
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
+# Database
+dev.db
 
 # Logs
 *.log
@@ -43,47 +37,18 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+*.env.*
 
-# Coverage
-.coverage
-htmlcov/
-.coverage.*
+# IDE
+.vscode/
+.idea/
 
-# Pytest
-.pytest_cache/
-
-# Mypy
-.mypy_cache/
-
-# FastAPI
-*.tmp
-
-# SQLite
-*.db
-*.db-journal
-
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
-
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 ```

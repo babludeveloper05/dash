@@ -1,10 +1,11 @@
-"""Auth service — registration, login, token verification, account lockout.
+"""Auth service — registration, login, token verification, account lockout, password reset, email verification.
 
 Business logic lives here. Routers call these functions and handle HTTP concerns
 (status codes, response models). This keeps the auth logic testable without
 needing a FastAPI TestClient.
 """
 import time
+import secrets
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -18,6 +19,12 @@ from auth import (
 )
 from security import sanitize_text
 from config import MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MINUTES
+from services.email_service import (
+    send_password_reset_email,
+    send_verification_email,
+    send_welcome_email,
+)
+from config import FRONTEND_URL
 
 # In-memory failed login tracking: { email: { count, locked_until } }
 # For multi-process, use Redis. For single-process (our deployment), this is fine.
@@ -38,18 +45,39 @@ def register_user(email: str, password: str, name: str, db: Session) -> tuple[Us
     if len(password) < 8:
         raise ValueError("Password must be at least 8 characters")
 
+    # Generate email verification token
+    verification_token = secrets.token_urlsafe(32)
+    
     user = User(
         email=email,
         password_hash=hash_password(password),
         name=sanitize_text(name, 100),
+        verification_token=verification_token,
+        is_verified=False,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
+    # Send verification email (async, non-blocking)
+    try:
+        import asyncio
+        from services.email_service import send_verification_email, send_welcome_email
+        asyncio.create_task(_send_verification_async(email, name, verification_token))
+    except Exception:
+        pass  # Don't fail registration if email fails
+
     access = create_access_token({"sub": user.id})
     refresh = create_refresh_token({"sub": user.id})
     return user, access, refresh
+
+
+async def _send_verification_async(email: str, name: str, token: str):
+    """Send verification email asynchronously."""
+    try:
+        await send_verification_email(email, name, token, FRONTEND_URL)
+    except Exception:
+        pass  # Silently ignore email failures in dev
 
 
 def login_user(email: str, password: str, db: Session) -> tuple[User, str, str]:
@@ -84,6 +112,77 @@ def login_user(email: str, password: str, db: Session) -> tuple[User, str, str]:
     access = create_access_token({"sub": user.id})
     refresh = create_refresh_token({"sub": user.id})
     return user, access, refresh
+
+
+def verify_email(token: str, db: Session) -> bool:
+    """Verify email with token. Returns True if successful."""
+    user = db.execute(select(User).where(User.verification_token == token)).scalar_one_or_none()
+    if not user:
+        return False
+    
+    # Check if token is expired (24 hours)
+    if user.created_at < datetime.now(timezone.utc) - timedelta(hours=24):
+        return False
+    
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    return True
+
+
+def request_password_reset(email: str, db: Session) -> bool:
+    """Request password reset. Sends email if user exists. Always returns True to prevent enumeration."""
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if not user:
+        return True  # Don't reveal if email exists
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    user.reset_token = reset_token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+    db.commit()
+    
+    # Send reset email
+    try:
+        import asyncio
+        asyncio.create_task(_send_reset_async(user.email, user.name, reset_token))
+    except Exception:
+        pass
+    
+    return True
+
+
+async def _send_reset_async(email: str, name: str, token: str):
+    """Send reset email asynchronously."""
+    try:
+        await send_password_reset_email(email, name, token, FRONTEND_URL)
+    except Exception:
+        pass
+
+
+def reset_password(token: str, new_password: str, db: Session) -> bool:
+    """Reset password with token. Returns True if successful."""
+    user = db.execute(
+        select(User).where(
+            User.reset_token == token,
+            User.reset_token_expires > datetime.now(timezone.utc)
+        )
+    ).scalar_one_or_none()
+    
+    if not user:
+        return False
+    
+    # Validate password
+    if len(new_password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    
+    user.password_hash = hash_password(new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    db.commit()
+    return True
 
 
 def refresh_access_token(refresh_token: str, db: Session) -> tuple[str, str] | None:
