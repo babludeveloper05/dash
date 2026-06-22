@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useStore, type TabId } from '@/lib/store'
-import { Avatar, IconButton } from './ui'
+import { Avatar, IconButton } from '@/shared/ui'
 import { cn } from '@/lib/utils'
 import { Bell, Search, Triangle, LogIn, LogOut } from 'lucide-react'
 import { navSpring } from '@/lib/motion'
