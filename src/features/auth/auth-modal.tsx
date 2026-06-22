@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Mail, Lock, User as UserIcon, Loader2, Check, AlertCircle } from 'lucide-react'
 import { useStore } from '@/lib/store'
-import { GlassCard } from './ui'
+import { GlassCard } from '@/shared/ui'
 
 export function AuthModal() {
   const { authModalOpen, setAuthModalOpen, setAuthUser } = useStore()

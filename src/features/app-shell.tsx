@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion, useMotionValue, useSpring, u
 import { useStore } from '@/lib/store'
 import { TopNav } from './top-nav'
 import { Spotlight } from './spotlight'
-import { Onboarding } from './onboarding'
+import { Onboarding } from './onboarding/onboarding'
 import { VideoLayer } from './content/video-player'
 import { ThemeVars } from '@/shared/theme-vars'
 import { AuthModal } from './auth/auth-modal'
