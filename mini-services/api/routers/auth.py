@@ -1,4 +1,4 @@
-"""Auth router — register, login, refresh, logout, me. Rate limited."""
+"""Auth router — register, login, refresh, logout, me. Rate limited + CSRF protected."""
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from services.auth_service import (
     refresh_access_token, logout_user,
 )
 from security import check_rate_limit
+from csrf import csrf_protect
 from config import AUTH_RATE_LIMIT, AUTH_RATE_WINDOW
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -30,7 +31,7 @@ class RefreshRequest(BaseModel):
 
 
 @router.post("/register", response_model=Token)
-def register(request: Request, body: UserCreate, db: Session = Depends(get_db)):
+def register(request: Request, body: UserCreate, db: Session = Depends(get_db), _ = Depends(csrf_protect)):
     ip = request.client.host if request.client else 'unknown'
     if not check_rate_limit(ip, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW):
         raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Max {AUTH_RATE_LIMIT} requests per {AUTH_RATE_WINDOW}s.")
@@ -43,7 +44,7 @@ def register(request: Request, body: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(request: Request, body: UserLogin, db: Session = Depends(get_db)):
+def login(request: Request, body: UserLogin, db: Session = Depends(get_db), _ = Depends(csrf_protect)):
     ip = request.client.host if request.client else 'unknown'
     if not check_rate_limit(ip, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW):
         raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Max {AUTH_RATE_LIMIT} requests per {AUTH_RATE_WINDOW}s.")
@@ -56,7 +57,7 @@ def login(request: Request, body: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh")
-def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
+def refresh(body: RefreshRequest, db: Session = Depends(get_db), _ = Depends(csrf_protect)):
     """Exchange a refresh token for a new access + refresh token pair."""
     result = refresh_access_token(body.refresh_token, db)
     if not result:
@@ -70,6 +71,7 @@ def logout(
     token: str = Depends(oauth2_scheme),
     body: RefreshRequest | None = None,
     db: Session = Depends(get_db),
+    _ = Depends(csrf_protect),
 ):
     """Invalidate the access token (and refresh token if provided) server-side."""
     logout_user(token, body.refresh_token if body else None)
