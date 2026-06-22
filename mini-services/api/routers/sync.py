@@ -1,5 +1,5 @@
-"""Sync router — thin handler calling sync_service."""
-from fastapi import APIRouter, Depends
+"""Sync router — thin handler calling sync_service. CSRF protected."""
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -11,12 +11,13 @@ from services.sync_service import (
     apply_notes, apply_doubts, apply_video_progress,
     apply_test_attempts, apply_components, build_sync_response,
 )
+from csrf import csrf_protect
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
 
 @router.post("", response_model=SyncResponse)
-def sync(payload: SyncPayload, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def sync(request: Request, payload: SyncPayload, user: User = Depends(get_current_user), db: Session = Depends(get_db), _ = Depends(csrf_protect)):
     """Push local state to server, return merged state."""
 
     if payload.profile:

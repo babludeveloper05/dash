@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from config import CORS_ORIGINS
 from database import engine, Base, get_db, SessionLocal
 from routers import auth, sync, notes, community, content
+from csrf import CSRFMiddleware
 
 # Create tables on startup (SQLite/Postgres compatible).
 Base.metadata.create_all(bind=engine)
@@ -40,6 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# CSRF Protection middleware — sets CSRF token cookie on every response
+app.add_middleware(CSRFMiddleware)
 
 # Mount routers.
 app.include_router(auth.router, prefix="/api")

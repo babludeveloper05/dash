@@ -1,54 +1,66 @@
 ```
-# Compiled and build artifacts
-*.pyc
+# Python
 __pycache__/
-*.o
-*.obj
-dist/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
-target/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Dependencies
-.venv/
+# Virtual Environment
 venv/
-node_modules/
-.julia/
-zig-cache/
+ENV/
+env/
+.venv/
+.env/
 
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-*.swo
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# System files
+# OS
 .DS_Store
 Thumbs.db
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
+# Logs
+*.log
 
-# Python specific
-.mypy_cache/
+# Environment variables
+.env
+.env.local
+
+# Coverage
+.coverage
+htmlcov/
+.coverage.*
+
+# Pytest
 .pytest_cache/
 
-# Node specific
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Mypy
+.mypy_cache/
+
+# FastAPI
+*.tmp
+
+# SQLite
+*.db
+*.db-journal
 
 # Compressed files
 *.zip
@@ -73,4 +85,5 @@ yarn-error.log*
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+
 ```

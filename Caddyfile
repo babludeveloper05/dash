@@ -21,7 +21,18 @@
                         Permissions-Policy "geolocation=(), microphone=(), camera=()"
                         # CSP — allow inline styles (Tailwind), scripts from self, and data: images
                         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'"
+                        # HSTS — enforce HTTPS in production (max-age=1 year)
+                        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
                 }
+                
+                # HTTPS redirect for production
+                @http {
+                        scheme http
+                }
+                handle @http {
+                        redir https://{host}{uri} permanent
+                }
+                
                 reverse_proxy localhost:3000 {
                         header_up Host {host}
                         header_up X-Forwarded-For {remote_host}
@@ -30,3 +41,22 @@
                 }
         }
 }
+
+# Production HTTPS server block (uncomment and configure domain for production)
+# delta.example.com {
+#         reverse_proxy localhost:3000 {
+#                 header_up Host {host}
+#                 header_up X-Forwarded-For {remote_host}
+#                 header_up X-Forwarded-Proto {scheme}
+#                 header_up X-Real-IP {remote_host}
+#         }
+#         
+#         header {
+#                 X-Content-Type-Options nosniff
+#                 X-Frame-Options DENY
+#                 Referrer-Policy strict-origin-when-cross-origin
+#                 Permissions-Policy "geolocation=(), microphone=(), camera=()"
+#                 Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'"
+#                 Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+#         }
+# }
