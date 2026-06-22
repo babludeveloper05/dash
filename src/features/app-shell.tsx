@@ -6,20 +6,14 @@ import { useStore } from '@/lib/store'
 import { TopNav } from './top-nav'
 import { Spotlight } from './spotlight'
 import { Onboarding } from './onboarding'
-import { VideoLayer } from './video-player'
-import { HomePage } from './pages/home'
-import { LibraryPage } from './pages/library'
-import { TestsPage } from './pages/tests'
-import { NotesPage } from './pages/notes'
-import { LivePage } from './pages/live'
-import { AnalyticsPage } from './pages/analytics'
-import { LeaderboardPage } from './pages/leaderboard'
-import { AchievementsPage } from './pages/achievements'
-import { ProfilePage } from './pages/profile'
-import { SettingsPage } from './pages/settings'
-import { SyllabusPage } from './pages/syllabus'
-import { DoubtsPage } from './pages/doubts'
-import { PlaygroundPage } from './pages/playground'
+import { VideoLayer } from './content/video-player'
+import { ThemeVars } from '@/shared/theme-vars'
+import { AuthModal } from './auth/auth-modal'
+import { OfflineBanner } from './offline-banner'
+import { useSync } from '@/adapters/sync-engine'
+import { useRealtime } from '@/lib/realtime'
+import { useAuthRefresh } from '@/hooks/use-auth-refresh'
+import { HomePage } from './home-page'
 import { Triangle } from 'lucide-react'
 import {
   pageVariants,
@@ -27,29 +21,11 @@ import {
   pageTransition,
   type PageTransitionCtx,
 } from '@/lib/motion'
-import { ThemeVars } from './theme-vars'
-import { AuthModal } from './auth-modal'
-import { OfflineBanner } from './offline-banner'
-import { useSync } from '@/adapters/sync-engine'
-import { useRealtime } from '@/lib/realtime'
-import { useAuthRefresh } from '@/hooks/use-auth-refresh'
 
 function ActivePage() {
   const tab = useStore((s) => s.activeTab)
   switch (tab) {
     case 'home': return <HomePage />
-    case 'library': return <LibraryPage />
-    case 'tests': return <TestsPage />
-    case 'notes': return <NotesPage />
-    case 'live': return <LivePage />
-    case 'analytics': return <AnalyticsPage />
-    case 'leaderboard': return <LeaderboardPage />
-    case 'achievements': return <AchievementsPage />
-    case 'profile': return <ProfilePage />
-    case 'settings': return <SettingsPage />
-    case 'syllabus': return <SyllabusPage />
-    case 'doubts': return <DoubtsPage />
-    case 'playground': return <PlaygroundPage />
     default: return <HomePage />
   }
 }
