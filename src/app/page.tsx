@@ -46,7 +46,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   }
 }
 
-import { AppShell } from "@/components/delta/app-shell";
+import { AppShell } from "@/features/app-shell";
 
 export default function Page() {
   return (
