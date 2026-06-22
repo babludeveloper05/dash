@@ -21,8 +21,9 @@ from sqlalchemy.orm import Session
 
 from config import CORS_ORIGINS
 from database import engine, Base, get_db, SessionLocal
-from routers import auth, sync, notes, community, content
+from routers import auth, sync, notes, community, content, realtime, notifications
 from csrf import CSRFMiddleware
+from auth_ws import get_current_user_from_ws
 
 # Create tables on startup (SQLite/Postgres compatible).
 Base.metadata.create_all(bind=engine)
@@ -51,6 +52,8 @@ app.include_router(sync.router, prefix="/api")
 app.include_router(notes.router, prefix="/api")
 app.include_router(community.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
+app.include_router(realtime.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 
 
 @app.get("/")

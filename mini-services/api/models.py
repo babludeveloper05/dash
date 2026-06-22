@@ -43,6 +43,12 @@ class User(Base):
     exam_name = Column(String, default="My Goal")
     track = Column(String, default="Learner")
     subjects = Column(JSON, default=list)  # ["Physics", "Algorithms", ...]
+    is_verified = Column(Boolean, default=False, index=True)  # Email verification status
+    reset_token = Column(String, nullable=True, index=True)  # Password reset token
+    reset_token_expires = Column(DateTime, nullable=True)  # Token expiration
+    verification_token = Column(String, nullable=True, index=True)  # Email verification token
+    failed_login_attempts = Column(Integer, default=0)  # Account lockout protection
+    locked_until = Column(DateTime, nullable=True)  # Lockout expiration
     created_at = Column(DateTime, default=_now)
     updated_at = Column(DateTime, default=_now, onupdate=_now)
 
@@ -293,3 +299,25 @@ class Achievement(Base):
     earned = Column(Boolean, default=False)
     earned_at = Column(String, nullable=True)
     progress = Column(Float, default=0)
+
+
+# --- Notifications ----------------------------------------------------------
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String, nullable=False, index=True)  # doubt_resolved, class_reminder, test_available, etc.
+    link = Column(String, nullable=True)  # Deep link to related content
+    is_read = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime, default=_now, index=True)
+    read_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="notifications")
+
+
+# Add back-populates to User model
+User.notifications = relationship("Notification", order_by=Notification.created_at.desc(), back_populates="user")

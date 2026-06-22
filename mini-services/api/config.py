@@ -64,3 +64,6 @@ AI_RATE_WINDOW = int(os.environ.get("AI_RATE_WINDOW", "60"))  # 60 seconds
 # Account lockout config
 MAX_LOGIN_ATTEMPTS = int(os.environ.get("MAX_LOGIN_ATTEMPTS", "5"))
 LOCKOUT_DURATION_MINUTES = int(os.environ.get("LOCKOUT_DURATION_MINUTES", "15"))
+
+# Frontend URL for email links
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
