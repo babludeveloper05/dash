@@ -24,7 +24,7 @@ export function GlassCard({
       className={cn(
         strong ? 'glass-strong' : 'glass',
         'rounded-2xl elev-1 transition-all duration-300',
-        hover && 'hover:elev-2 hover:-translate-y-0.5 cursor-pointer',
+        hover && 'hover:elev-2 hover:-translate-y-0.5 hover:border-white/15 cursor-pointer',
         className
       )}
       {...props}
@@ -118,8 +118,8 @@ export function PrimaryButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground',
-        'transition-all hover:brightness-110 active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none',
+        'inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground glow-primary',
+        'transition-all hover:brightness-110 hover:glow-primary-strong active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none',
         className
       )}
     >
@@ -218,16 +218,16 @@ export function MetricCard({
   className?: string
 }) {
   return (
-    <GlassCard className={cn('p-4 flex flex-col gap-2', className)}>
+    <GlassCard hover className={cn('p-4 flex flex-col gap-2', className)}>
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
-          {icon}
+          {icon && <span className="text-primary/80">{icon}</span>}
           {label}
         </span>
         {trend && (
           <span
             className={cn(
-              'text-[11px] font-medium tabular px-1.5 py-0.5 rounded-md',
+              'text-[11px] font-semibold tabular px-1.5 py-0.5 rounded-md',
               trend.value >= 0 ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
             )}
           >
@@ -237,7 +237,7 @@ export function MetricCard({
           </span>
         )}
       </div>
-      <div className="text-2xl font-light tracking-tight tabular">{value}</div>
+      <div className="text-[28px] leading-none font-light tracking-tight tabular text-foreground">{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
     </GlassCard>
   )
@@ -334,7 +334,7 @@ export function Avatar({ name, size = 36, className }: { name: string; size?: nu
   return (
     <div
       className={cn(
-        'grid place-items-center rounded-full bg-gradient-to-br from-white/15 to-white/5 border border-border text-foreground font-medium',
+        'grid place-items-center rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-border text-foreground font-semibold ring-1 ring-inset ring-white/10 elev-1',
         className
       )}
       style={{ width: size, height: size, fontSize: size * 0.36 }}
@@ -353,7 +353,7 @@ export function Avatar({ name, size = 36, className }: { name: string; size?: nu
 export function EmptyState({ icon, title, hint, cta }: { icon: ReactNode; title: string; hint?: string; cta?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 text-center h-full text-muted-foreground py-12">
-      <div className="grid place-items-center size-14 rounded-2xl bg-white/5 border border-border text-muted-foreground">{icon}</div>
+      <div className="grid place-items-center size-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary elev-1">{icon}</div>
       <div>
         <p className="text-sm font-medium text-foreground">{title}</p>
         {hint && <p className="text-xs mt-1 max-w-xs text-pretty">{hint}</p>}

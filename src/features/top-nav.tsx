@@ -49,7 +49,7 @@ export function TopNav() {
         className="flex items-center gap-2.5 shrink-0 group"
         aria-label="Project Delta — Home"
       >
-        <span className="grid place-items-center size-8 rounded-xl bg-primary text-primary-foreground transition-transform group-hover:scale-105">
+        <span className="grid place-items-center size-8 rounded-xl bg-primary text-primary-foreground glow-primary transition-transform group-hover:scale-105 group-active:scale-95">
           <Triangle className="size-4 fill-current" />
         </span>
         <span className="hidden sm:block font-semibold tracking-tight text-[15px]">
