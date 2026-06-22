@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from config import CORS_ORIGINS
 from database import engine, Base, get_db, SessionLocal
-from routers import auth, sync, notes, community, content, realtime, notifications
+from routers import auth, sync, notes, community, content, realtime, notifications, admin, video, quiz, backups, sms_2fa, db_health
 from csrf import CSRFMiddleware
 from auth_ws import get_current_user_from_ws
 
@@ -54,6 +54,12 @@ app.include_router(community.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(video.router, prefix="/api")
+app.include_router(quiz.router, prefix="/api")
+app.include_router(backups.router, prefix="/api")
+app.include_router(sms_2fa.router, prefix="/api")
+app.include_router(db_health.router, prefix="/api")
 
 
 @app.get("/")
